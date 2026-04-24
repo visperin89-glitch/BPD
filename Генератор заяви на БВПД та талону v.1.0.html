@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор Заяви та Талону БВПД</title>
+    
+    <!-- Шрифти Google: Roboto -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Бібліотеки для DOCX -->
+    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        :root {
+            --md-sys-color-primary: #005cbb;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #d7e3ff;
+            --md-sys-color-surface: #fdfbff;
+            --md-sys-color-surface-container: #f0f4f9;
+            --md-sys-color-outline: #74777f;
+            --md-sys-color-error: #ba1a1a;
+            --radius-medium: 12px;
+            --radius-large: 24px;
+            --radius-full: 100px;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f2f6fc;
+            color: #1a1b1f;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: var(--md-sys-color-surface);
+            border-radius: var(--radius-large);
+            padding: 40px;
+            width: 100%;
+            max-width: 800px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        header { text-align: center; margin-bottom: 40px; }
+        h1 { font-size: 28px; font-weight: 500; margin: 0 0 10px 0; }
+        
+        .form-section {
+            margin-bottom: 32px;
+            padding: 24px;
+            background-color: var(--md-sys-color-surface-container);
+            border-radius: var(--radius-medium);
+            border: 1px solid #e1e3e1;
+            transition: all 0.3s ease;
+        }
+
+        .section-title {
+            color: var(--md-sys-color-primary);
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .input-group { margin-bottom: 20px; position: relative; }
+        label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: #444746; }
+        .helper-text { font-size: 11px; color: #444746; margin-top: 4px; display: block; line-height: 1.4; }
+
+        input[type="text"], input[type="date"], input[type="number"], textarea, select {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border: 1px solid var(--md-sys-color-outline);
+            border-radius: 4px;
+            box-sizing: border-box;
+            background: white;
+            font-family: 'Roboto', sans-serif;
+        }
+        
+        input[readonly] {
+            background-color: #e0e0e0;
+            color: #555;
+            cursor: not-allowed;
+            border-color: #bdbdbd;
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007CB2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: .65em auto;
+            white-space: normal;
+            text-overflow: ellipsis; 
+        }
+        
+        textarea { min-height: 80px; resize: vertical; }
+
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
+
+        .btn-group-actions {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .btn-generate {
+            display: flex; align-items: center; justify-content: center;
+            flex: 1; min-width: 250px; height: 56px;
+            background-color: var(--md-sys-color-primary);
+            color: var(--md-sys-color-on-primary);
+            border: none; border-radius: var(--radius-full);
+            font-size: 16px; font-weight: 500; cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            margin-top: 20px;
+        }
+        .btn-generate:hover { background-color: #004a99; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+        
+        .hidden-section, .hidden-field { display: none; }
+
+        /* Styles for dynamic attachments */
+        .attachment-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .attachment-number { font-weight: 500; min-width: 20px; color: var(--md-sys-color-primary); }
+        .attachment-name { flex-grow: 1; }
+        .attachment-pages { width: 60px !important; text-align: center; padding: 14px 5px !important; }
+        .attachment-suffix { white-space: nowrap; font-size: 14px; color: #444746; }
+        
+        .btn-icon {
+            width: 36px; height: 36px;
+            border-radius: 50%; border: none;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: background 0.2s;
+            font-weight: bold; font-size: 18px;
+        }
+        .btn-add { background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); margin-top: 10px; width: auto; padding: 0 20px; border-radius: 20px; font-size: 14px; }
+        .btn-add:hover { background-color: #c0d0f0; }
+        
+        .btn-remove { background-color: #ffdad6; color: var(--md-sys-color-error); width: 30px; height: 30px; font-size: 14px; }
+        .btn-remove:hover { background-color: #ffb4ab; }
+
+        .help-icon {
+            display: inline-block; width: 20px; height: 20px;
+            background-color: var(--md-sys-color-primary);
+            color: white; border-radius: 50%;
+            text-align: center; line-height: 20px;
+            font-size: 14px; font-weight: bold; cursor: pointer;
+            margin-left: 8px; vertical-align: middle;
+            user-select: none; transition: background-color 0.2s;
+        }
+        .help-icon:hover { background-color: #004a99; }
+
+        .law-description-box {
+            margin-top: 10px; padding: 16px;
+            background-color: #e8f0fe;
+            border-left: 4px solid var(--md-sys-color-primary);
+            border-radius: 4px; font-size: 14px; line-height: 1.5;
+            color: #333; display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 600px) {
+            .attachment-row { flex-wrap: wrap; position: relative; }
+            .attachment-name { width: 100%; order: 1; margin-left: 30px; margin-right: 40px; } /* Space for delete button */
+            .attachment-number { order: 0; }
+            .attachment-pages { order: 2; margin-left: 30px; }
+            .attachment-suffix { order: 3; }
+            .attachment-suffix:nth-of-type(1) { order: 1; margin-left: 0; }
+            .btn-remove { position: absolute; right: 0; top: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Генератор Заяви на БВПД</h1>
+        <div style="font-size: 14px; color: #666;">Автоматичне заповнення згідно зі ст. 14 Закону</div>
+    </header>
+
+    <form id="legalForm">
+        
+        <!-- БЛОК 0: Центр -->
+        <div class="form-section">
+            <h3 class="section-title">Оберіть центр</h3>
+            <div class="input-group">
+                <label>Регіональний центр</label>
+                <select id="centerSelect">
+                    <option value="Південному міжрегіональному центру з надання безоплатної правничої допомоги">Південний міжрегіональний центр</option>
+                    <option value="Північному міжрегіональному центру з надання безоплатної правничої допомоги">Північний міжрегіональний центр</option>
+                    <option value="Західному міжрегіональному центру з надання безоплатної правничої допомоги">Західний міжрегіональний центр</option>
+                    <option value="Південно-Східному міжрегіональному центру з надання безоплатної правничої допомоги">Південно-Східний міжрегіональний центр</option>
+                    <option value="Східному міжрегіональному центру з надання безоплатної правничої допомоги">Східний міжрегіональний центр</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- БЛОК 1: Заявник -->
+        <div class="form-section">
+            <h3 class="section-title">1. Дані заявника</h3>
+            <div class="input-group">
+                <label>ПІБ Заявника/Представника</label>
+                <input type="text" id="applicantName" placeholder="Іванов Іван Іванович">
+            </div>
+            
+            <div class="row">
+                <div class="input-group">
+                    <label>Телефон</label>
+                    <input type="text" id="applicantPhone" placeholder="+380...">
+                </div>
+                <div class="input-group">
+                    <label>Адреса електронної пошти</label>
+                    <input type="text" id="applicantEmail" placeholder="email@example.com">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label>Адреса проживання</label>
+                <input type="text" id="applicantAddress" placeholder="вулиця, будинок, кв., місто, індекс">
+                <span class="helper-text">вулиця, номер будинку, номер квартири, населений пункт, район, область, поштовий індекс</span>
+            </div>
+
+            <div class="input-group">
+                <label>Повідомити мене</label>
+                <select id="notifyMethod">
+                    <option value="телефоном">телефоном</option>
+                    <option value="засобами поштового зв'язку на адресу (вказану в зверненні адресу)">засобами поштового зв'язку на адресу (вказану в зверненні адресу)</option>
+                    <option value="особисто при відвідуванні бюро правничої допомоги">особисто при відвідуванні бюро правничої допомоги</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label>Документ особи</label>
+                <input type="text" id="applicantPassport" placeholder="Паспорт серії...">
+                <span class="helper-text">серія, номер, ким видано, дата видачі</span>
+            </div>
+        </div>
+
+        <!-- БЛОК 2: Суть -->
+        <div class="form-section">
+            <h3 class="section-title">2. Суть звернення</h3>
+            <div class="input-group">
+                <label>Кому надати допомогу (ПІБ)</label>
+                <input type="text" id="helpReceiverName" placeholder="Іванову Івану Івановичу">
+            </div>
+            
+            <div class="input-group">
+                <label>Вид правової послуги</label>
+                <select id="questionDetails">
+                    <option value="" disabled selected>Оберіть вид послуги...</option>
+                    <option value="здійснення представництва інтересів">здійснення представництва інтересів (включає і складення документів процесуального характеру)</option>
+                    <option value="здійснення представництва інтересів в суді">здійснення представництва інтересів в суді</option>
+                    <option value="складення документів процесуального характеру">складення документів процесуального характеру (не включає представництво інтересів в судах, інших державних органах, органах місцевого самоврядування, перед іншими особами)</option>
+                    <option value="здійснення представництва інтересів в судах, інших державних органах, органах місцевого самоврядування, перед іншими особами">здійснення представництва інтересів в судах, інших державних органах, органах місцевого самоврядування, перед іншими особами (включає і складення документів процесуального характеру)</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label>У справі</label>
+                <textarea id="caseDetails" placeholder="(коротко викладається суть правового питання)"></textarea>
+            </div>
+            
+            <div class="input-group">
+                <label>
+                    Категорія суб'єкта права (Пункт ч. 1 ст. 14 Закону)
+                    <span class="help-icon" onclick="toggleLawDescription()" title="Показати повний опис">?</span>
+                </label>
+                <select id="lawPointSelect">
+                    <option value="" disabled selected>Оберіть категорію...</option>
+                    <option value="1_low">п. 1 - Малозабезпечені особи</option>
+                    <option value="1_disability">п. 1 - Особи з інвалідністю</option>
+                    <option value="2">п. 2 – Діти</option>
+                    <option value="9">п. 9 – Засуджені та особи, взяті під варту</option>
+                    <option value="10">п. 10 – Біженці</option>
+                    <option value="11">п. 11 – Іноземці та особи без громадянства</option>
+                    <option value="12">п. 12 – Особи без громадянства (заява)</option>
+                    <option value="13">п. 13 – Особи без документів</option>
+                    <option value="14">п. 14 – Внутрішньо переміщені особи (ВПО)</option>
+                    <option value="15">п. 15 – Особи, які подали заяву на ВПО</option>
+                    <option value="16">п. 16 – Жителі окупованих територій / зон бойових дій</option>
+                    <option value="17">п. 17 – Ветерани війни та сім'ї загиблих</option>
+                    <option value="18">п. 18 – Особи, які звернулися за статусом ветерана</option>
+                    <option value="19">п. 19 – Особливі заслуги / жертви нацизму</option>
+                    <option value="20">п. 20 – Реабілітовані</option>
+                    <option value="21">п. 21 – Постраждалі від торгівлі людьми</option>
+                    <option value="22">п. 22 – Постраждалі від домашнього насильства</option>
+                    <option value="23">п. 23 – Потерпілі від катувань / сексуал. насильства</option>
+                    <option value="24">п. 24 – Обмеження дієздатності</option>
+                    <option value="25">п. 25 – Психіатрична допомога</option>
+                    <option value="26">п. 26 – Викривачі корупції</option>
+                    <option value="27">п. 27 – Повідомлення про активи (санкції)</option>
+                    <option value="28">п. 28 – Позбавлені свободи (агресія РФ)</option>
+                    <option value="28-1">п. 28-1 – Родичі зниклих безвісти</option>
+                    <option value="29">п. 29 – Відновлення документів для компенсації</option>
+                </select>
+                <div id="lawDescription" class="law-description-box"></div>
+            </div>
+        </div>
+
+        <!-- БЛОК 3: Доходи -->
+        <div class="form-section hidden-section" id="incomeSection">
+            <h3 class="section-title">3. Доходи</h3>
+            
+            <div class="row">
+                <div class="input-group">
+                    <div id="periodQuarterBlock" class="hidden-field">
+                        <label>Період (квартал)</label>
+                        <select id="incomePeriodQuarter">
+                            <option value="1 квартал">1 квартал</option>
+                            <option value="2 квартал">2 квартал</option>
+                            <option value="3 квартал">3 квартал</option>
+                            <option value="4 квартал">4 квартал</option>
+                        </select>
+                        <span class="helper-text">за квартал, який передує місяцю, що є попереднім до місяця звернення</span>
+                    </div>
+
+                    <div id="periodMonthBlock" class="hidden-field">
+                        <label>Період (місяць)</label>
+                        <select id="incomePeriodMonth">
+                            <option value="січень">січень</option>
+                            <option value="лютий">лютий</option>
+                            <option value="березень">березень</option>
+                            <option value="квітень">квітень</option>
+                            <option value="травень">травень</option>
+                            <option value="червень">червень</option>
+                            <option value="липень">липень</option>
+                            <option value="серпень">серпень</option>
+                            <option value="вересень">вересень</option>
+                            <option value="жовтень">жовтень</option>
+                            <option value="листопад">листопад</option>
+                            <option value="грудень">грудень</option>
+                        </select>
+                        <span class="helper-text">за останній місяць, що передує даті звернення</span>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <label>Рік</label>
+                    <input type="number" id="incomeYear" value="2025">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="input-group"><label>Сума (грн)</label><input type="text" id="incomeAmount" placeholder="0.00"></div>
+                <div class="input-group"><label>Джерело</label><input type="text" id="incomeSource" placeholder="заробітна плата"></div>
+            </div>
+        </div>
+
+        <!-- БЛОК 4: Додатки -->
+        <div class="form-section">
+            <h3 class="section-title" id="titleAttachments">4. Додатки</h3>
+            
+            <div id="attachmentsContainer">
+                <!-- Динамічні рядки будуть тут -->
+            </div>
+            
+            <button type="button" class="btn-icon btn-add" onclick="addAttachmentRow()">+ Додати рядок</button>
+        </div>
+
+        <!-- БЛОК 5: Підпис -->
+        <div class="form-section">
+            <h3 class="section-title" id="titleSignature">5. Підпис</h3>
+            <div class="row">
+                <div class="input-group">
+                    <label>Дата</label>
+                    <input type="date" id="docDate">
+                </div>
+                <div class="input-group">
+                    <label>П.І.Б., підпис заявника/представника</label>
+                    <input type="text" id="signerName" placeholder="Заповнюється автоматично" readonly>
+                </div>
+            </div>
+        </div>
+
+        <!-- БЛОК 6: Службові відмітки -->
+        <div class="form-section">
+            <h3 class="section-title">6. Службові відмітки (для Талону та реєстрації)</h3>
+            <div class="input-group">
+                <label>ПІБ працівника, який прийняв заяву</label>
+                <input type="text" id="workerName" placeholder="Петров Петро Петрович">
+            </div>
+            <div class="row">
+                <div class="input-group">
+                    <label>№ РКЗК</label>
+                    <input type="text" id="rkzkNum" placeholder="12345">
+                </div>
+                <div class="input-group">
+                    <label>Реєстраційний номер звернення</label>
+                    <input type="text" id="regNum" placeholder="123/05-25">
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Дата реєстрації звернення</label>
+                <input type="date" id="regDate">
+            </div>
+        </div>
+
+        <div class="btn-group-actions">
+            <button type="button" class="btn-generate" onclick="generateDoc()">
+                Сформувати Заяву (.docx)
+            </button>
+            <button type="button" class="btn-generate" onclick="generateTalon()">
+                Сформувати Талон (.docx)
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+    // Повний текст категорій для відображення в описі
+    const LAW_DESCRIPTIONS = {
+        "1_low": "п. 1 ч. 1 ст. 14 Закону - Малозабезпечені особи (повнолітні особи, які перебувають під юрисдикцією України, якщо їхній середньомісячний дохід, розрахований відповідно до методики, затвердженої Міністерством юстиції України, не перевищує двох розмірів прожиткового мінімуму, розрахованого та затвердженого відповідно до закону для осіб, які належать до основних соціальних і демографічних груп населення).",
+        "1_disability": "п. 1 ч. 1 ст. 14 Закону - Особи з інвалідністю (особи з інвалідністю, які отримують пенсію або державну соціальну допомогу відповідно до законів України \"Про державну соціальну допомогу особам з інвалідністю з дитинства та дітям з інвалідністю\" і \"Про державну соціальну допомогу особам, які не мають права на пенсію, та особам з інвалідністю\", у розмірі, що не перевищує двох прожиткових мінімумів для працездатної особи).",
+        "2": "п. 2 ч. 1 ст. 14 Закону – Діти.",
+        "9": "п. 9 ч. 1 ст. 14 Закону – Засуджені до покарання у виді довічного позбавлення волі, позбавлення волі на певний строк, тримання в дисциплінарному батальйоні військовослужбовців або обмеження волі.",
+        "10": "п. 10 ч. 1 ст. 14 Закону – Біженці (особи, на яких поширюється дія Закону України \"Про біженців та осіб, які потребують додаткового або тимчасового захисту\").",
+        "11": "п. 11 ч. 1 ст. 14 Закону – Іноземці та особи без громадянства, затримані з метою ідентифікації та забезпечення примусового видворення.",
+        "12": "п. 12 ч. 1 ст. 14 Закону – Особи, які звернулися із заявою про визнання особою без громадянства.",
+        "13": "п. 13 ч. 1 ст. 14 Закону – Особи, які не мають документів, що посвідчують особу та підтверджують громадянство України.",
+        "14": "п. 14 ч. 1 ст. 14 Закону – Внутрішньо переміщені особи.",
+        "15": "п. 15 ч. 1 ст. 14 Закону – Особи, які звернулися із заявою про взяття їх на облік як внутрішньо переміщених осіб.",
+        "16": "п. 16 ч. 1 ст. 14 Закону – Громадяни України, які проживають на тимчасово окупованій території або на території територіальних громад, що розташовані в районі проведення воєнних (бойових) дій або які перебувають в тимчасовій окупації, оточенні (блокуванні).",
+        "17": "п. 17 ч. 1 ст. 14 Закону – Ветерани війни та члени сімей загиблих (померлих) ветеранів війни, члени сімей загиблих (померлих) Захисників і Захисниць України, особи, які мають особливі заслуги перед Батьківщиною.",
+        "18": "п. 18 ч. 1 ст. 14 Закону – Особи, які перебувають під юрисдикцією України і звернулися для отримання статусу особи, на яку поширюється дія Закону України \"Про статус ветеранів війни, гарантії їх соціального захисту\".",
+        "19": "п. 19 ч. 1 ст. 14 Закону – Особи, які мають особливі трудові заслуги перед Батьківщиною, та особи, які належать до числа жертв нацистських переслідувань.",
+        "20": "п. 20 ч. 1 ст. 14 Закону – Особи, реабілітовані відповідно до законодавства України.",
+        "21": "п. 21 ч. 1 ст. 14 Закону – Особи, які постраждали від торгівлі людьми.",
+        "22": "п. 22 ч. 1 ст. 14 Закону – Особи, які постраждали від домашнього насильства або насильства за ознакою статі, - на правничі послуги.",
+        "23": "п. 23 ч. 1 ст. 14 Закону – Потерпілі від кримінальних правопорушень проти статевої свободи та статевої недоторканості, катування або жорстокого поводження під час воєнних дій чи збройного конфлікту.",
+        "24": "п. 24 ч. 1 ст. 14 Закону – Особи, стосовно яких суд розглядає справи про обмеження цивільної дієздатності фізичної особи, визнання фізичної особи недієздатною; поновлення цивільної дієздатності недієздатних фізичних осіб та фізичних осіб, цивільна дієздатність яких обмежена, звільнення від повноважень опікунів чи піклувальників таких осіб.",
+        "25": "п. 25 ч. 1 ст. 14 Закону – Особи, стосовно яких суд розглядає справи про надання психіатричної допомоги у примусовому порядку або примусову госпіталізацію до протитуберкульозного закладу.",
+        "26": "п. 26 ч. 1 ст. 14 Закону – Викривачі у зв’язку з повідомленням ними інформації про корупційне або пов’язане з корупцією правопорушення.",
+        "27": "п. 27 ч. 1 ст. 14 Закону – Особи, які повідомили про активи, зазначені у пунктах 1, 1-1 частини першої статті 4 Закону України \"Про санкції\".",
+        "28": "п. 28 ч. 1 ст. 14 Закону – Особи, стосовно яких згідно із Законом України \"Про соціальний і правовий захист осіб, стосовно яких встановлено факт позбавлення особистої свободи внаслідок збройної агресії проти України, та членів їхніх сімей\" встановлено факт позбавлення особистої свободи внаслідок збройної агресії проти України.",
+        "28-1": "п. 28-1 ч. 1 ст. 14 Закону – Близькі родичі та члени сім’ї особи, зниклої безвісти за особливих обставин, - на правничі послуги, передбачені пунктами 2 і 3 частини другої статті 13 цього Закону, з питань, пов’язаних із захистом їхніх прав чи інтересів та/або прав чи інтересів особи, зниклої безвісти за особливих обставин, визначених Законом України \"Про правовий статус осіб, зниклих безвісти за особливих обставин\".",
+        "29": "п. 29 ч. 1 ст. 14 Закону – громадяни України, які звернулися з питань встановлення в судовому порядку фактів, що мають юридичне значення, пов’язаних з відновленням втрачених документів, необхідних для отримання компенсації відповідно до Закону України \"Про компенсацію за пошкодження та знищення окремих категорій об’єктів нерухомого майна внаслідок бойових дій, терористичних актів, диверсій, спричинених збройною агресією Російської Федерації проти України, та Державний реєстр майна, пошкодженого та знищеного внаслідок бойових дій, терористичних актів, диверсій, спричинених збройною агресією Російської Федерації проти України\"."
+    };
+
+    function toggleLawDescription() {
+        const lawDescription = document.getElementById('lawDescription');
+        if (lawDescription.style.display === 'block') {
+            lawDescription.style.display = 'none';
+        } else {
+            lawDescription.style.display = 'block';
+        }
+    }
+    
+    // Dynamic Attachments Logic
+    function addAttachmentRow(initialData = null) {
+        const container = document.getElementById('attachmentsContainer');
+        const index = container.children.length + 1;
+        
+        const row = document.createElement('div');
+        row.className = 'attachment-row';
+        row.innerHTML = `
+            <span class="attachment-number">${index}.</span>
+            <input type="text" class="attachment-name" placeholder="Назва документу" value="${initialData?.name || ''}">
+            <span class="attachment-suffix">на</span>
+            <input type="text" class="attachment-pages" placeholder="__" value="${initialData?.pages || ''}">
+            <span class="attachment-suffix">арк. в 1 прим.</span>
+            <button type="button" class="btn-icon btn-remove" onclick="removeAttachmentRow(this)">✕</button>
+        `;
+        container.appendChild(row);
+    }
+
+    function removeAttachmentRow(btn) {
+        const row = btn.parentElement;
+        row.remove();
+        updateAttachmentNumbers();
+    }
+
+    function updateAttachmentNumbers() {
+        const rows = document.querySelectorAll('.attachment-row');
+        rows.forEach((row, index) => {
+            row.querySelector('.attachment-number').textContent = `${index + 1}.`;
+        });
+    }
+
+    function getAttachmentsData() {
+        const rows = document.querySelectorAll('.attachment-row');
+        const data = [];
+        rows.forEach(row => {
+            const name = row.querySelector('.attachment-name').value.trim();
+            const pages = row.querySelector('.attachment-pages').value.trim();
+            if (name) { // Only collect rows that have a name, or you can allow empty
+                data.push({ name, pages });
+            } else {
+                 // Push empty object to maintain line in Zayava if needed, but for Talon logic implies filled
+                 data.push({ name: "", pages: ""});
+            }
+        });
+        return data;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const lawSelect = document.getElementById('lawPointSelect');
+        const incomeSection = document.getElementById('incomeSection');
+        const lawDescription = document.getElementById('lawDescription');
+        const titleAttachments = document.getElementById('titleAttachments');
+        const titleSignature = document.getElementById('titleSignature');
+        
+        const periodQuarterBlock = document.getElementById('periodQuarterBlock');
+        const periodMonthBlock = document.getElementById('periodMonthBlock');
+        
+        const applicantNameInput = document.getElementById('applicantName');
+        const signerNameInput = document.getElementById('signerName');
+        
+        // Init 5 empty rows
+        for(let i=0; i<5; i++) addAttachmentRow();
+
+        // Синхронізація дат
+        const docDateInput = document.getElementById('docDate');
+        const regDateInput = document.getElementById('regDate');
+
+        // Встановлюємо сьогоднішню дату для дати підпису та реєстрації
+        const today = new Date();
+        docDateInput.valueAsDate = today;
+        regDateInput.valueAsDate = today;
+
+        // Автоматичне оновлення дати реєстрації при зміні дати підпису
+        docDateInput.addEventListener('change', function() {
+            regDateInput.value = this.value;
+        });
+
+        applicantNameInput.addEventListener('input', function() {
+            signerNameInput.value = this.value;
+        });
+
+        if(applicantNameInput.value) {
+            signerNameInput.value = applicantNameInput.value;
+        }
+
+        function handleCategoryChange() {
+            const val = lawSelect.value;
+            if (val && LAW_DESCRIPTIONS[val]) {
+                lawDescription.textContent = LAW_DESCRIPTIONS[val];
+            } else {
+                lawDescription.textContent = "Будь ласка, оберіть категорію зі списку, щоб побачити детальний опис.";
+            }
+
+            periodQuarterBlock.style.display = 'none';
+            periodMonthBlock.style.display = 'none';
+            
+            if (val === '1_low' || val === '1_disability') {
+                incomeSection.style.display = 'block';
+                if (val === '1_low') periodQuarterBlock.style.display = 'block';
+                else if (val === '1_disability') periodMonthBlock.style.display = 'block';
+
+                titleAttachments.textContent = '4. Додатки';
+                titleSignature.textContent = '5. Підпис';
+            } else {
+                incomeSection.style.display = 'none';
+                titleAttachments.textContent = '3. Додатки';
+                titleSignature.textContent = '4. Підпис';
+            }
+        }
+
+        lawSelect.addEventListener('change', handleCategoryChange);
+        handleCategoryChange();
+    });
+
+    // Helper for formatting date
+    function getFormattedDate(dateObj) {
+        if (!dateObj) return "«____» ____________ 20__";
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const monthNames = ["січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"];
+        return `«${day}» ${monthNames[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+    }
+
+    function getShortDate(dateObj) {
+         if (!dateObj) return "__.__.____";
+         const day = String(dateObj.getDate()).padStart(2, '0');
+         const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+         return `${day}.${month}.${dateObj.getFullYear()}`;
+    }
+
+    function collectData() {
+        const lawPointSelect = document.getElementById('lawPointSelect');
+        const rawLawValue = lawPointSelect.value || "______";
+        let cleanLawPoint = rawLawValue;
+        if (rawLawValue === '1_low' || rawLawValue === '1_disability') cleanLawPoint = '1';
+        
+        let selectedPeriod = "______";
+        if (rawLawValue === '1_low') selectedPeriod = document.getElementById('incomePeriodQuarter').value;
+        else if (rawLawValue === '1_disability') selectedPeriod = document.getElementById('incomePeriodMonth').value;
+
+        return {
+            centerName: document.getElementById('centerSelect').value,
+            applicantName: document.getElementById('applicantName').value || "___________________________________________",
+            applicantAddress: document.getElementById('applicantAddress').value || "___________________________________________",
+            applicantPhone: document.getElementById('applicantPhone').value || "___________________________________________",
+            applicantEmail: document.getElementById('applicantEmail').value.trim(),
+            notifyMethod: document.getElementById('notifyMethod').value,
+            applicantPassport: document.getElementById('applicantPassport').value || "___________________________________________",
+            helpReceiverName: document.getElementById('helpReceiverName').value || "___________________________________________",
+            questionDetails: document.getElementById('questionDetails').value || "___________________________________________",
+            caseDetails: document.getElementById('caseDetails').value || "___________________________________________",
+            lawPoint: cleanLawPoint, 
+            incomePeriod: selectedPeriod,
+            incomeYear: document.getElementById('incomeYear').value || "20__",
+            incomeAmount: document.getElementById('incomeAmount').value || "______________",
+            incomeSource: document.getElementById('incomeSource').value || "___________________",
+            categoryPoint: cleanLawPoint,
+            signerName: document.getElementById('signerName').value || "_________________________________",
+            docDate: document.getElementById('docDate').valueAsDate,
+            workerName: document.getElementById('workerName').value || "_________________________________",
+            rkzkNum: document.getElementById('rkzkNum').value || "__________",
+            regNum: document.getElementById('regNum').value || "_______/_________",
+            regDate: document.getElementById('regDate').valueAsDate,
+            attachments: getAttachmentsData()
+        };
+    }
+
+    function generateDoc() {
+        const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, VerticalAlign } = docx;
+        const d = collectData();
+        const dateStr = getFormattedDate(d.docDate) + " року";
+        const regDateStr = d.regDate ? getShortDate(d.regDate) : "________________";
+        
+        // Поля згідно зі скриншотом: 1 см, 1.25 см, 2.5 см, 1.5 см
+        const MARGINS = { top: 567, bottom: 709, left: 1418, right: 851 }; 
+        const INDENT = 680; // 1.2 см
+        const FONT = "Times New Roman";
+        const SIZE = 24; // 12pt
+        const HEADER_INDENT = 4252;
+        const SIGNATURE_TAB_POSITION = 9300; 
+        
+        // Інтервали згідно зі скриншотом: перед/після 0 пт, одинарний (240)
+        const BODY_SPACING = { before: 0, after: 0, line: 240 };
+        
+        // ВАЖЛИВО: Явне вказування мови uk-UA для всіх текстових блоків!
+        const TR = (text, opt = {}) => new TextRun({ text: text, font: FONT, size: SIZE, language: "uk-UA", ...opt });
+        const TR_B = (text) => TR(text, { bold: true });
+
+        const attachmentParagraphs = d.attachments.map((att, index) => {
+            let textStr = att.name 
+                ? `${index + 1}. ${att.name} на ${att.pages || "__"} арк. в 1 прим.` 
+                : `${index + 1}. ______________________________________________ на __ арк. в 1 прим.`;
+            return new Paragraph({ children: [TR(textStr)], indent: { firstLine: INDENT }, spacing: BODY_SPACING });
+        });
+
+        const bodyParagraphs = [];
+        // 1. Request
+        bodyParagraphs.push(new Paragraph({ 
+            alignment: AlignmentType.JUSTIFIED, 
+            indent: { firstLine: INDENT }, 
+            spacing: BODY_SPACING, 
+            children: [
+                TR("Прошу надати мені, "), 
+                TR(d.helpReceiverName + " "), 
+                TR("безоплатну вторинну правничу допомогу з питання "), 
+                TR(d.questionDetails + " "), 
+                TR("у справі "), 
+                TR(d.caseDetails + ".")
+            ] 
+        }));
+
+        // 2. Subject of Law
+        bodyParagraphs.push(new Paragraph({ 
+            alignment: AlignmentType.JUSTIFIED, 
+            indent: { firstLine: INDENT }, 
+            spacing: BODY_SPACING, 
+            children: [
+                TR("Суб’єкт права на безоплатну вторинну правничу допомогу, визначеного пунктом "), 
+                TR(d.lawPoint), 
+                TR(" частини першої статті 14 Закону України «Про безоплатну правничу допомогу» (далі - Закон).")
+            ] 
+        }));
+
+        // 3. Rights and Duties
+        bodyParagraphs.push(new Paragraph({ 
+            alignment: AlignmentType.JUSTIFIED, 
+            indent: { firstLine: INDENT }, 
+            spacing: BODY_SPACING, 
+            children: [
+                TR("З правами та обов’язками суб’єктів права на безоплатну вторинну правничу допомогу, визначеними у статті 26"), 
+                TR("1", { superScript: true }), 
+                TR(" Закону, ознайомлений (-а), у тому числі щодо обов'язку вчасно подавати до міжрегіонального центру з надання безоплатної правничої допомоги правдиві відомості у повному обсязі, необхідні для організації надання мені безоплатної вторинної правничої допомоги.")
+            ] 
+        }));
+
+        // 4. Compensation Obligation
+        bodyParagraphs.push(new Paragraph({ 
+            alignment: AlignmentType.JUSTIFIED, 
+            indent: { firstLine: INDENT }, 
+            spacing: BODY_SPACING, 
+            children: [
+                TR("Про зобов’язання здійснити відшкодування вартості фактичних витрат, пов’язаних з наданням безоплатної вторинної правничої допомоги, у разі припинення її надання у зв’язку з встановленням факту подання неправдивих відомостей, що стали підставою для надання такої допомоги, повідомлений (-а).")
+            ] 
+        }));
+
+        // 5. Income (Conditional)
+        if (d.lawPoint === '1') {
+            bodyParagraphs.push(new Paragraph({ 
+                alignment: AlignmentType.JUSTIFIED, 
+                indent: { firstLine: INDENT }, 
+                spacing: BODY_SPACING, 
+                children: [
+                    TR("Засвідчую, що на момент подання цієї заяви отримав (-ла) дохід за "), 
+                    TR(d.incomePeriod), TR(" " + d.incomeYear), 
+                    TR(" року у розмірі "), TR(d.incomeAmount), 
+                    TR(" грн. ("), 
+                    TR(d.incomeSource),
+                    TR(").")
+                ] 
+            }));
+            
+            // 6. No other income
+            bodyParagraphs.push(new Paragraph({ 
+                alignment: AlignmentType.JUSTIFIED, 
+                indent: { firstLine: INDENT }, 
+                spacing: BODY_SPACING, 
+                children: [
+                    TR("Інших доходів, крім тих, що зазначені в цій заяві та поданих документах (довідках), не маю.")
+                ] 
+            }));
+        }
+
+        // 7. Copies of documents
+        bodyParagraphs.push(new Paragraph({ 
+            alignment: AlignmentType.JUSTIFIED, 
+            indent: { firstLine: INDENT }, 
+            spacing: BODY_SPACING, 
+            children: [
+                TR("Копії документів, що ідентифікують особу та підтверджують мою належність до категорії осіб, передбаченої пунктом "), 
+                TR(d.categoryPoint), 
+                TR(" частини першої статті 14 цього Закону, додаються до цієї заяви.")
+            ] 
+        }));
+
+        // 8. Notification preference
+        bodyParagraphs.push(new Paragraph({ 
+            alignment: AlignmentType.JUSTIFIED, 
+            indent: { firstLine: INDENT }, 
+            spacing: BODY_SPACING, 
+            children: [
+                TR("Про прийняте центром рішення прошу мене повідомити "),
+                TR(d.notifyMethod),
+                TR(".")
+            ] 
+        }));
+
+        const noBorders = {
+             top: { style: BorderStyle.NONE },
+             bottom: { style: BorderStyle.NONE },
+             left: { style: BorderStyle.NONE },
+             right: { style: BorderStyle.NONE },
+             insideHorizontal: { style: BorderStyle.NONE },
+             insideVertical: { style: BorderStyle.NONE }
+        };
+
+        const doc = new Document({
+            creator: "Система БВПД",
+            title: "Заява",
+            sections: [{
+                properties: { page: { margin: MARGINS } },
+                children: [
+                    new Paragraph({ children: [TR_B(d.centerName)], indent: { left: HEADER_INDENT }, alignment: AlignmentType.LEFT, spacing: BODY_SPACING }),
+                    new Paragraph({ text: "", spacing: BODY_SPACING }),
+                    new Paragraph({ children: [TR(d.applicantName)], indent: { left: HEADER_INDENT }, alignment: AlignmentType.LEFT, spacing: BODY_SPACING }),
+                    new Paragraph({ children: [TR(d.applicantAddress)], indent: { left: HEADER_INDENT }, alignment: AlignmentType.LEFT, spacing: BODY_SPACING }),
+                    new Paragraph({ children: [TR(d.applicantPhone)], indent: { left: HEADER_INDENT }, alignment: AlignmentType.LEFT, spacing: BODY_SPACING }),
+                    ...(d.applicantEmail ? [new Paragraph({ children: [TR(d.applicantEmail)], indent: { left: HEADER_INDENT }, alignment: AlignmentType.LEFT, spacing: BODY_SPACING })] : []),
+                    new Paragraph({ children: [TR(d.applicantPassport)], indent: { left: HEADER_INDENT }, alignment: AlignmentType.LEFT, spacing: BODY_SPACING }),
+                    new Paragraph({ text: "", spacing: BODY_SPACING }),
+                    new Paragraph({ children: [TR("ЗАЯВА", { size: 28, bold: true })], alignment: AlignmentType.CENTER, spacing: BODY_SPACING }),
+                    new Paragraph({ children: [TR_B("про надання безоплатної вторинної правничої допомоги")], alignment: AlignmentType.CENTER, spacing: BODY_SPACING }),
+                    new Paragraph({ text: "", spacing: BODY_SPACING }),
+                    ...bodyParagraphs,
+                    new Paragraph({ text: "", spacing: BODY_SPACING }),
+                    new Paragraph({ children: [TR_B("Додатки:")], indent: { firstLine: INDENT }, spacing: BODY_SPACING }),
+                    ...attachmentParagraphs,
+                    new Paragraph({ text: "", spacing: { after: 240 } }),
+                    new Paragraph({
+                        children: [TR(dateStr), new TextRun({ text: "\t" + d.signerName, font: FONT, size: SIZE, language: "uk-UA" })],
+                        tabStops: [{ type: "right", position: SIGNATURE_TAB_POSITION }],
+                        spacing: BODY_SPACING
+                    }),
+                    new Paragraph({ text: "", spacing: { after: 120 } }),
+                    
+                    // New Footer Table Layout with 3 Columns for proper alignment
+                    new Table({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        borders: noBorders,
+                        rows: [
+                            new TableRow({
+                                children: [
+                                    // Left Cell: "Прийняв:" block (45% width)
+                                    new TableCell({
+                                        width: { size: 45, type: WidthType.PERCENTAGE },
+                                        children: [
+                                            new Paragraph({ children: [TR("Прийняв:")] }),
+                                            new Paragraph({ children: [TR(d.workerName)] }),
+                                            new Paragraph({ children: [TR("________________")] })
+                                        ]
+                                    }),
+                                    // Middle Cell: "№" and "від" block (55% width to prevent wrap)
+                                    new TableCell({
+                                        width: { size: 55, type: WidthType.PERCENTAGE },
+                                        children: [
+                                            new Paragraph({ 
+                                                children: [TR("№ " + d.regNum)], 
+                                                alignment: AlignmentType.LEFT 
+                                            }),
+                                            new Paragraph({ 
+                                                children: [TR("від " + regDateStr)], 
+                                                alignment: AlignmentType.LEFT 
+                                            })
+                                        ],
+                                        verticalAlign: VerticalAlign.TOP
+                                    })
+                                ]
+                            })
+                        ]
+                    })
+                ]
+            }]
+        });
+
+        Packer.toBlob(doc).then(blob => saveAs(blob, "Zayava_BVPD_Final.docx"));
+    }
+
+    function generateTalon() {
+        const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, UnderlineType } = docx;
+        const d = collectData();
+        const regDateStr = getShortDate(d.regDate);
+        const issueDateStr = getShortDate(d.docDate || new Date()); 
+        
+        const FONT = "Times New Roman";
+        const SIZE_NORMAL = 24;
+        const SIZE_HEADER = 28;
+        const SIZE_8PT = 16; 
+        const SIZE_12PT = 24; 
+        const SIZE_10PT = 20;
+        const SIZE_11PT = 22;
+
+        // ВАЖЛИВО: Явне вказування мови uk-UA для всіх текстових блоків у Талоні!
+        const TR = (text, opt = {}) => new TextRun({ text: text, font: FONT, size: SIZE_NORMAL, language: "uk-UA", ...opt });
+        const TR_B = (text) => TR(text, { bold: true });
+        const TR_11 = (text, opt={}) => new TextRun({ text: text, font: FONT, size: SIZE_11PT, language: "uk-UA", ...opt });
+        
+        const TALON_MARGINS = {
+            top: 567,
+            bottom: 709,
+            left: 1418,
+            right: 851
+        };
+
+        // Table generation
+        const tableRows = [];
+        // Header
+        tableRows.push(new TableRow({
+            children: [
+                new TableCell({ children: [new Paragraph({ children: [TR_B("№ з/п")], alignment: AlignmentType.CENTER })], width: { size: 10, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ children: [TR_B("Вид документа")], alignment: AlignmentType.CENTER })], width: { size: 60, type: WidthType.PERCENTAGE } }),
+                new TableCell({ children: [new Paragraph({ children: [TR_B("Дата прийняття")], alignment: AlignmentType.CENTER })], width: { size: 30, type: WidthType.PERCENTAGE } }),
+            ]
+        }));
+        
+        // Dynamic Rows based on Attachments
+        d.attachments.forEach((att, index) => {
+            if (att.name) { // Only add row if name exists
+                tableRows.push(new TableRow({
+                    children: [
+                        new TableCell({ children: [new Paragraph({ children: [TR((index + 1).toString())], alignment: AlignmentType.CENTER })] }),
+                        new TableCell({ children: [new Paragraph({ children: [TR(att.name)], alignment: AlignmentType.LEFT })] }), // Left Aligned
+                        new TableCell({ children: [new Paragraph({ children: [TR(regDateStr)], alignment: AlignmentType.CENTER })] }),
+                    ],
+                    height: { value: 300 }
+                }));
+            }
+        });
+
+        const table = new Table({
+            rows: tableRows,
+            width: { size: 100, type: WidthType.PERCENTAGE }
+        });
+
+        // Rights text
+        const rightsText = [
+            "1) особисто або через представника звертатися із зверненням про надання безоплатної вторинної правничої допомоги до центру з надання безоплатної правничої допомоги (далі – центр), найближчого до місця фактичного проживання, за отриманням одного з таких видів правничих послуг: захист, здійснення представництва інтересів в суді інших державних органах, органах місцевого самоврядування, перед іншими особами, складення документів процесуального характеру;",
+            "2) отримувати від центру інформацію про документи, які необхідно подати для прийняття рішення про надання безоплатної вторинної правничої допомоги;",
+            "3) отримати копію рішення про надання (відмову в наданні) безоплатної вторинної правничої допомоги;",
+            "4) отримати роз’яснення щодо порядку оскарження рішення про відмову в наданні безоплатної вторинної правничої допомоги;",
+            "5) своєчасно отримувати якісну, у повному обсязі безоплатну вторинну правничу допомогу;",
+            "6) безперервно отримувати безоплатну вторинну правничу допомогу в разі заміни адвоката або працівника, уповноваженого центром;",
+            "7) отримувати безоплатну вторинну правничу допомогу в межах національних засобів правового захисту (правнича допомога щодо звернень до Європейського суду з прав людини не надається)."
+        ];
+
+        const dutiesText = [
+            "1) вчасно подавати до центру правдиві відомості у повному обсязі, необхідні для організації надання йому такої допомоги;",
+            "2) невідкладно повідомляти центр про припинення існування обставин чи підстав, за наявності яких особа була віднесена до категорій осіб, передбачених статтею 14 Закону, а також про залучення ним іншого захисника (представника);",
+            "3) відшкодовувати вартість фактичних витрат, пов’язаних з наданням безоплатної вторинної правничої допомоги, у разі припинення її надання у зв’язку з встановленням факту подання неправдивих відомостей, що стали підставою для надання такої допомоги;",
+            "4) нести всі необхідні судові/процесуальні, інші витрати у справі, крім витрат на оплату послуг адвокатів, які надають безоплатну вторинну правничу допомогу, та відшкодовувати витрати, що пов’язані з її наданням, і послуги перекладу;",
+            "5) з’являтися у визначені центром час та місце для організації надання безоплатної вторинної правничої допомоги."
+        ];
+
+        const rememberText = [
+            "1) правничу допомогу у вигляді захисту, складання документів правового характеру та представництва інтересів в судах надає адвокат/працівник центру (за дорученням/наказом центру);",
+            "2) центр має право замінити адвоката/працівника центру у випадку його хвороби, повної або часткової втрати працездатності, смерті адвоката/працівника; неналежного виконання адвокатом своїх зобов’язань за умовами договору; відмови адвоката/працівника центру від виконання доручення/наказу центру з підстав, передбачених законом; зміни підсудності провадження або справи чи підслідності кримінального правопорушення; припинення дії договору про надання безоплатної вторинної правничої допомоги; неналежне надання безоплатної вторинної правничої допомоги працівником центру, припинення трудового договору з працівником; зупинення або припинення права на зайняття адвокатською діяльністю; виключення адвоката з Реєстру адвокатів, які надають безоплатну вторинну правничу допомогу; наявності інших підстав, передбачених законом."
+        ];
+
+        // Invisible borders for signature tables
+        const noBorders = {
+             top: { style: BorderStyle.NONE },
+             bottom: { style: BorderStyle.NONE },
+             left: { style: BorderStyle.NONE },
+             right: { style: BorderStyle.NONE },
+             insideHorizontal: { style: BorderStyle.NONE },
+             insideVertical: { style: BorderStyle.NONE }
+        };
+
+        const doc = new Document({
+            creator: "Система БВПД",
+            title: "Талон",
+            sections: [
+                {
+                    properties: {
+                        page: {
+                            margin: TALON_MARGINS
+                        }
+                    },
+                    children: [
+                        new Paragraph({ children: [TR("ТАЛОН", { size: SIZE_HEADER, bold: true })], alignment: AlignmentType.CENTER }),
+                        new Paragraph({ children: [TR("про прийняття заяви про надання безоплатної вторинної правничої допомоги", { size: SIZE_12PT, bold: true })], alignment: AlignmentType.CENTER }),
+                        new Paragraph({ children: [TR(`до реєстраційного номеру звернення від ${regDateStr} № ${d.rkzkNum}`, { size: SIZE_10PT })], alignment: AlignmentType.CENTER }), // RkZk num added here
+                        new Paragraph({ children: [TR(`виданий ${d.centerName}`, { size: SIZE_12PT })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
+                        
+                        new Paragraph({ children: [TR(d.helpReceiverName, { size: SIZE_12PT, bold: true })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
+                        
+                        new Paragraph({ children: [TR("про те, що центром було прийнято та зареєстровано Вашу заяву, до якої додані копії таких документів:", { size: SIZE_12PT, bold: true })], alignment: AlignmentType.JUSTIFIED, spacing: { after: 100 } }),
+                        table,
+                        new Paragraph({ text: "", spacing: { after: 200 } }),
+                        new Paragraph({ 
+                            children: [TR("Протягом 10 робочих днів центром буде прийнято рішення про надання або відмову у наданні Вам безоплатної вторинної правничої допомоги, про що Вас буде повідомлено.")], 
+                            alignment: AlignmentType.JUSTIFIED,
+                            indent: { firstLine: 709 },
+                            spacing: { line: 276 } 
+                        }),
+                        new Paragraph({ children: [
+                            TR("У разі виникнення уточнювальних запитань, "),
+                            TR("у тому числі для отримання інформації про прийняте центром рішення про надання або відмову у наданні Вам безоплатної вторинної правничої допомоги", { bold: true }),
+                            TR(", Ви можете звернутися на Єдиний контактний номер телефону системи надання безоплатної правничої допомоги "),
+                            TR("0 800 213 103", { bold: true }),
+                            TR(" (усі дзвінки безкоштовні). Під час розмови з працівником вкажіть, будь ласка, реєстраційний номер Вашого звернення.")
+                        ], 
+                        alignment: AlignmentType.JUSTIFIED, 
+                        indent: { firstLine: 709 },
+                        spacing: { before: 100, after: 200, line: 276 } 
+                        }),
+                        
+                        // Підпис 1: Дата та Працівник (Table)
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            borders: noBorders,
+                            rows: [
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            width: { size: 50, type: WidthType.PERCENTAGE },
+                                            children: [new Paragraph({ children: [TR(`Дата видачі: ${issueDateStr}`)] })]
+                                        }),
+                                        new TableCell({
+                                            width: { size: 50, type: WidthType.PERCENTAGE },
+                                            children: [
+                                                new Paragraph({ 
+                                                    children: [
+                                                        new TextRun({ 
+                                                            text: d.workerName, 
+                                                            font: FONT, 
+                                                            size: SIZE_NORMAL,
+                                                            underline: { type: UnderlineType.SINGLE, color: "000000" },
+                                                            language: "uk-UA"
+                                                        })
+                                                    ],
+                                                    alignment: AlignmentType.CENTER
+                                                }),
+                                                new Paragraph({ 
+                                                    children: [
+                                                        new TextRun({ text: "/власне ім’я, прізвище працівника центру/", font: FONT, size: SIZE_8PT, language: "uk-UA" })
+                                                    ],
+                                                    alignment: AlignmentType.CENTER
+                                                })
+                                            ]
+                                        })
+                                    ]
+                                })
+                            ]
+                        }),
+                        
+                        new Paragraph({ text: "", spacing: { after: 100 } }),
+
+                        // Підпис 2: Отримав та Заявник (Table)
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            borders: noBorders,
+                            rows: [
+                                new TableRow({
+                                    children: [
+                                        new TableCell({
+                                            width: { size: 50, type: WidthType.PERCENTAGE },
+                                            children: [new Paragraph({ children: [TR("Отримав:")] })]
+                                        }),
+                                        new TableCell({
+                                            width: { size: 50, type: WidthType.PERCENTAGE },
+                                            children: [
+                                                new Paragraph({ 
+                                                    children: [
+                                                        new TextRun({ 
+                                                            text: d.signerName, 
+                                                            font: FONT, 
+                                                            size: SIZE_NORMAL, 
+                                                            underline: { type: UnderlineType.SINGLE, color: "000000" },
+                                                            language: "uk-UA"
+                                                        })
+                                                    ],
+                                                    alignment: AlignmentType.CENTER
+                                                }),
+                                                new Paragraph({ 
+                                                    children: [
+                                                        new TextRun({ text: "/власне ім’я, прізвище особи, яка звернулася за безоплатною вторинною правничою допомогою/представника/", font: FONT, size: SIZE_8PT, language: "uk-UA" })
+                                                    ],
+                                                    alignment: AlignmentType.CENTER
+                                                })
+                                            ]
+                                        })
+                                    ]
+                                })
+                            ]
+                        })
+                    ]
+                },
+                {
+                    properties: {
+                        page: {
+                            margin: TALON_MARGINS
+                        }
+                    },
+                    children: [
+                        // Header: Right aligned italic
+                        new Paragraph({ 
+                            children: [TR_11("[Зворотна сторона талона]", { italics: true })], 
+                            alignment: AlignmentType.RIGHT 
+                        }),
+                        
+                        // Main Title: Center Bold
+                        new Paragraph({ 
+                            children: [TR_11("Права та обов’язки особи – суб’єкта права", { bold: true })], 
+                            alignment: AlignmentType.CENTER 
+                        }),
+                        new Paragraph({ 
+                            children: [TR_11("на безоплатну вторинну правничу допомогу", { bold: true })], 
+                            alignment: AlignmentType.CENTER, 
+                            spacing: { after: 200 } 
+                        }),
+
+                        // Intro paragraphs: Justified, indent 1.25cm, single spacing
+                        new Paragraph({ 
+                            children: [TR_11("Права та обов’язки суб’єктів права на безоплатну вторинну правничу допомогу передбачені Законом України «Про безоплатну правничу допомогу» (далі – Закон), іншими актами законодавства.")], 
+                            alignment: AlignmentType.JUSTIFIED,
+                            indent: { firstLine: 709 } // 1.25cm
+                        }),
+                        new Paragraph({ 
+                            children: [TR_11("Безоплатна вторинна правнича допомога – вид державної гарантії, що полягає у створенні рівних можливостей для доступу осіб до правосуддя.")], 
+                            alignment: AlignmentType.JUSTIFIED, 
+                            indent: { firstLine: 709 },
+                            spacing: { after: 100 } 
+                        }),
+                        
+                        // Rights Section
+                        new Paragraph({ 
+                            children: [TR_11("Суб’єкт права на безоплатну вторинну правничу допомогу має право:", { bold: true })], 
+                            indent: { firstLine: 709 },
+                            spacing: { before: 100 } 
+                        }),
+                        ...rightsText.map(t => new Paragraph({ 
+                            children: [TR_11(t)], 
+                            alignment: AlignmentType.JUSTIFIED,
+                            indent: { firstLine: 709 }
+                        })),
+                        
+                        // Duties Section
+                        new Paragraph({ 
+                            children: [TR_11("Суб’єкт права на безоплатну вторинну правничу допомогу зобов’язаний:", { bold: true })], 
+                            indent: { firstLine: 709 },
+                            spacing: { before: 100 } 
+                        }),
+                        ...dutiesText.map(t => new Paragraph({ 
+                            children: [TR_11(t)], 
+                            alignment: AlignmentType.JUSTIFIED,
+                            indent: { firstLine: 709 }
+                        })),
+                        
+                        // Remember Section
+                        new Paragraph({ 
+                            children: [TR_11("Пам’ятати, що:", { bold: true })], 
+                            indent: { firstLine: 709 },
+                            spacing: { before: 100 } 
+                        }),
+                        ...rememberText.map(t => new Paragraph({ 
+                            children: [TR_11(t)], 
+                            alignment: AlignmentType.JUSTIFIED,
+                            indent: { firstLine: 709 }
+                        })),
+
+                        // Bottom Signature (Table approach for wrapping on right)
+                        new Paragraph({ text: "", spacing: { after: 400 } }),
+                        new Table({
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                            borders: noBorders,
+                            rows: [
+                                new TableRow({
+                                    children: [
+                                        new TableCell({ width: { size: 40, type: WidthType.PERCENTAGE }, children: [] }), // Empty left spacer
+                                        new TableCell({
+                                            width: { size: 60, type: WidthType.PERCENTAGE },
+                                            children: [
+                                                new Paragraph({ 
+                                                    children: [
+                                                        new TextRun({ 
+                                                            text: d.signerName, 
+                                                            font: FONT, 
+                                                            size: 24, // 12pt
+                                                            underline: { type: UnderlineType.SINGLE, color: "000000" },
+                                                            language: "uk-UA"
+                                                        })
+                                                    ],
+                                                    alignment: AlignmentType.CENTER
+                                                }),
+                                                new Paragraph({ 
+                                                    children: [
+                                                        new TextRun({ 
+                                                            text: "( власне ім’я, прізвище особи, яка звернулася за безоплатною вторинною правничою допомогою, законного представника/представника )", 
+                                                            font: FONT, 
+                                                            size: SIZE_8PT,
+                                                            language: "uk-UA"
+                                                        })
+                                                    ],
+                                                    alignment: AlignmentType.CENTER
+                                                })
+                                            ]
+                                        })
+                                    ]
+                                })
+                            ]
+                        })
+                    ]
+                }
+            ]
+        });
+
+        Packer.toBlob(doc).then(blob => saveAs(blob, "Talon_BVPD.docx"));
+    }
+</script>
+
+</body>
+</html>
