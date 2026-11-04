@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор Заяви та Талону БВПД</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="css/styles.css">
+
+    <!-- Зовнішні бібліотеки -->
+    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script type="module">
+        import * as shevchenkoModule from 'https://esm.sh/shevchenko';
+        window.shevchenko = shevchenkoModule.default || shevchenkoModule;
+    </script>
+
+    <!-- Модулі додатку -->
+    <script src="js/config.js"></script>
+    <script src="js/income-calculator.js"></script>
+    <script src="js/ai-helper.js"></script>
+    <script src="js/docx-generator.js"></script>
+    <script src="js/app.js"></script>
+</head>
+<body>
+
+<div id="toastMessage"></div>
+
+<div class="modal-overlay" id="previewModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Попередній перегляд</h2>
+            <button class="close-btn" id="closePreviewBtn">&times;</button>
+        </div>
+        <div class="modal-body" id="previewDocContent">
+            <!-- Вміст формується динамічно -->
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <button id="themeToggle" title="Перемкнути тему">🌙</button>
+    
+    <header>
+        <h1>Генератор документів на БВПД</h1>
+    </header>
+
+    <div style="display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 20px; gap: 10px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input type="file" id="importProfileInput" accept=".json" style="display:none">
+            <button type="button" class="btn-clear" id="btnImportProfile" title="Завантажити дані клієнта з файлу">📂 Імпорт профілю</button>
+            <button type="button" class="btn-clear" id="btnExportProfile" title="Зберегти дані клієнта у файл">💾 Експорт профілю</button>
+        </div>
+        <button type="button" class="btn-clear danger" id="btnClearClientData" title="Очистити всі поля, крім даних працівника">↺ Скинути дані</button>
+    </div>
+
+    <form id="legalForm">
+        <section class="form-section">
+            <h3 class="section-title">Оберіть центр</h3>
+            <div class="input-group">
+                <label for="centerSelect">Регіональний центр</label>
+                <select id="centerSelect">
+                    <option value="Південному міжрегіональному центру з надання безоплатної правничої допомоги">Південний міжрегіональний центр</option>
+                    <option value="Північному міжрегіональному центру з надання безоплатної правничої допомоги">Північний міжрегіональний центр</option>
+                    <option value="Західному міжрегіональному центру з надання безоплатної правничої допомоги">Західний міжрегіональний центр</option>
+                    <option value="Південно-Східному міжрегіональному центру з надання безоплатної правничої допомоги">Південно-Східний міжрегіональний центр</option>
+                    <option value="Східному міжрегіональному центру з надання безоплатної правничої допомоги">Східний міжрегіональний центр</option>
+                </select>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <h3 class="section-title">1. Дані заявника</h3>
+            <div class="input-group">
+                <label for="applicantName">ПІБ Заявника/Представника (у називному відмінку) *</label>
+                <input type="text" id="applicantName" placeholder="Іванов Іван Іванович">
+                <div class="spinner" id="spinnerApplicant"></div>
+                <div id="applicantGenitiveHelper" class="inflection-helper">
+                    <label for="applicantNameGenitive">Родовий відмінок (Від кого? — для шапки заяви):</label>
+                    <input type="text" id="applicantNameGenitive" placeholder="Іванова Івана Івановича">
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="input-group">
+                    <label for="applicantPhone">Телефон *</label>
+                    <input type="text" id="applicantPhone" placeholder="+38 (0__) ___-__-__">
+                </div>
+                <div class="input-group">
+                    <label for="applicantEmail">Адреса електронної пошти</label>
+                    <input type="text" id="applicantEmail" placeholder="email@example.com">
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label for="applicantAddress">Адреса проживання *</label>
+                <input type="text" id="applicantAddress" placeholder="вулиця, будинок, кв., місто, індекс">
+            </div>
+
+            <div class="input-group">
+                <label for="notifyMethod">Повідомити мене</label>
+                <select id="notifyMethod">
+                    <option value="телефоном">телефоном</option>
+                    <option value="засобами поштового зв'язку на адресу (вказану в зверненні адресу)">засобами поштового зв'язку на адресу (вказану в зверненні адресу)</option>
+                    <option value="особисто при відвідуванні бюро правничої допомоги">особисто при відвідуванні бюро правничої допомоги</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="applicantPassport">Документ особи *</label>
+                <input type="text" id="applicantPassport" placeholder="Паспорт серії...">
+            </div>
+        </section>
+
+        <section class="form-section">
+            <h3 class="section-title">2. Суть звернення</h3>
+            
+            <div class="input-group">
+                <label for="helpReceiverName">Кому надати допомогу (ПІБ у називному відмінку) *</label>
+                <input type="text" id="helpReceiverName" placeholder="Іванов Іван Іванович">
+                <div class="spinner" id="spinnerReceiver"></div>
+                <div id="receiverDativeHelper" class="inflection-helper">
+                    <label for="helpReceiverNameDative">Давальний відмінок (Кому? — для тексту заяви та наказів):</label>
+                    <input type="text" id="helpReceiverNameDative" placeholder="Іванову Івану Івановичу">
+                </div>
+                <div id="receiverGenitiveHelper" class="inflection-helper">
+                    <label for="helpReceiverNameGenitive">Родовий відмінок (Кого? — для наказів та службових):</label>
+                    <input type="text" id="helpReceiverNameGenitive" placeholder="Іванова Івана Івановича">
+                </div>
+            </div>
+            
+            <div class="input-group" style="margin-bottom: 20px;">
+                <label>Тип провадження</label>
+                <div class="radio-group">
+                    <label class="radio-label"><input type="radio" name="caseType" value="civil" checked> Цивільне / Адміністративне (КАСУ)</label>
+                    <label class="radio-label"><input type="radio" name="caseType" value="criminal"> Кримінальне (Потерпілий)</label>
+                    <label class="radio-label"><input type="radio" name="caseType" value="admin"> Адмін. правопорушення (КУпАП)</label>
+                </div>
+            </div>
+
+            <div id="civilFieldsBlock">
+                <div class="input-group">
+                    <label for="questionDetails">Вид правничої послуги *</label>
+                    <select id="questionDetails">
+                        <option value="" disabled selected>Оберіть вид послуги...</option>
+                        <option value="здійснення представництва інтересів в суді">здійснення представництва інтересів в суді</option>
+                        <option value="здійснення представництва інтересів">здійснення представництва інтересів</option>
+                        <option value="складення документів процесуального характеру">складення документів процесуального характеру</option>
+                        <option value="здійснення представництва інтересів в інших державних органах, органах місцевого самоврядування, перед іншими особами">здійснення представництва інтересів в інших державних органах, органах місцевого самоврядування, перед іншими особами</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="caseDetails">У справі *</label>
+                    <textarea id="caseDetails" placeholder="(коротко викладається суть правового питання)"></textarea>
+                </div>
+            </div>
+
+            <div id="criminalFieldsBlock" class="hidden-field">
+                <div class="row">
+                    <div class="input-group">
+                        <label for="erdrNum">Номер ЄРДР *</label>
+                        <input type="text" id="erdrNum" placeholder="Наприклад: 12025164490000371">
+                    </div>
+                    <div class="input-group">
+                        <label for="erdrDate">Дата внесення до ЄРДР *</label>
+                        <input type="date" id="erdrDate">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="input-group">
+                        <label for="criminalArticle">Кваліфікація (Стаття КК України) *</label>
+                        <input type="text" id="criminalArticle" placeholder="Наприклад: ч. 1 ст. 125 КК України">
+                    </div>
+                    <div class="input-group">
+                        <label for="courtCaseNum">Номер судової справи (якщо є)</label>
+                        <input type="text" id="courtCaseNum" placeholder="Наприклад: 522/21325/25">
+                    </div>
+                </div>
+            </div>
+
+            <div id="adminFieldsBlock" class="hidden-field">
+                <div class="input-group">
+                    <label for="adminServiceType">Вид послуги (КУпАП)</label>
+                    <select id="adminServiceType">
+                        <option value="representation_appeal">здійснення представництва інтересів в суді (судове провадження не відкрито)</option>
+                        <option value="representation_court">здійснення представництва інтересів (судове провадження відкрито)</option>
+                        <option value="defense">з питання захисту</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="adminArticle">Кваліфікація (Стаття КУпАП)</label>
+                    <input type="text" id="adminArticle" placeholder="Наприклад: ч. 1 ст. 130">
+                </div>
+
+                <div class="input-group" id="adminCourtBlock" style="display: none;">
+                    <label for="adminCourtCaseNum">Номер судової справи</label>
+                    <input type="text" id="adminCourtCaseNum" placeholder="Наприклад: 522/26805/25">
+                </div>
+
+                <div class="row" id="adminAppealBlock">
+                    <div class="input-group">
+                        <label for="adminPostanovaSeries">Серія</label>
+                        <input type="text" id="adminPostanovaSeries" placeholder="Наприклад: ААА">
+                    </div>
+                    <div class="input-group">
+                        <label for="adminPostanovaNumber">№</label>
+                        <input type="text" id="adminPostanovaNumber" placeholder="Наприклад: 1193">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-group" style="margin-top: 20px;">
+                <label for="lawPointSearch">
+                    Категорія суб'єкта права (Пункт ч. 1 ст. 14 Закону) *
+                    <span id="helpIconBtn" class="help-icon" title="Показати повний опис">?</span>
+                </label>
+                <div style="position: relative;">
+                    <input type="text" id="lawPointSearch" list="lawPointOptions" placeholder="Почніть вводити (наприклад: ВПО, 14)..." style="padding-right: 36px;">
+                    <button type="button" id="clearLawSearchBtn" title="Очистити поле" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: transparent; border: none; font-size: 18px; cursor: pointer; color: var(--md-sys-color-outline); display: none; padding: 0;">✕</button>
+                </div>
+                <datalist id="lawPointOptions">
+                    <option value="п. 1 - Малозабезпечені особи"></option>
+                    <option value="п. 1 - Особи з інвалідністю"></option>
+                    <option value="п. 2 – Діти"></option>
+                    <option value="п. 9 – Засуджені та особи, взяті под варту"></option>
+                    <option value="п. 10 – Біженці"></option>
+                    <option value="п. 11 – Іноземці та особи без громадянства"></option>
+                    <option value="п. 12 – Особи без громадянства (заява)"></option>
+                    <option value="п. 13 – Особи без документів"></option>
+                    <option value="п. 14 – Внутрішньо переміщені особи (ВПО)"></option>
+                    <option value="п. 15 – Особи, які подали заяву на ВПО"></option>
+                    <option value="п. 16 – Жителі окупованих територій / зон бойових дій"></option>
+                    <option value="п. 17 – Ветерани війни та сім'ї загиблих"></option>
+                    <option value="п. 18 – Особи, які звернулися за статусом ветерана"></option>
+                    <option value="п. 19 – Особливі заслуги / жертви нацизму"></option>
+                    <option value="п. 20 – Реабілітовані"></option>
+                    <option value="п. 21 – Постраждалі від торгівлі людьми"></option>
+                    <option value="п. 22 – Постраждалі від домашнього насильства"></option>
+                    <option value="п. 23 – Потерпілі від катувань / сексуал. насильства"></option>
+                    <option value="п. 24 – Обмеження дієздатності"></option>
+                    <option value="п. 25 – Психіатрична допомога"></option>
+                    <option value="п. 26 – Викривачі корупції"></option>
+                    <option value="п. 27 – Повідомлення про активи (санкції)"></option>
+                    <option value="п. 28 – Позбавлені свободи (агресія РФ)"></option>
+                    <option value="п. 28-1 – Родичі зниклих безвісти"></option>
+                    <option value="п. 29 – Відновлення документів для компенсації"></option>
+                </datalist>
+                <input type="hidden" id="lawPointSelect" value="">
+                <div id="lawDescription" class="law-description-box"></div>
+            </div>
+        </section>
+
+        <section class="form-section hidden-section" id="incomeSection">
+            <h3 class="section-title">3. Доходи</h3>
+            <p class="helper-text" style="color: var(--md-sys-color-error); margin-bottom: 15px;">* Для обраної категорії заповнення доходів є обов'язковим.</p>
+            <div class="row">
+                <div class="input-group">
+                    <div id="periodQuarterBlock" class="hidden-field">
+                        <label for="incomePeriodQuarter">Період (квартал)</label>
+                        <select id="incomePeriodQuarter">
+                            <option value="1 квартал">1 квартал</option>
+                            <option value="2 квартал">2 квартал</option>
+                            <option value="3 квартал">3 квартал</option>
+                            <option value="4 квартал">4 квартал</option>
+                        </select>
+                    </div>
+                    <div id="periodMonthBlock" class="hidden-field">
+                        <label for="incomePeriodMonth">Період (місяць)</label>
+                        <select id="incomePeriodMonth">
+                            <option value="січень">січень</option>
+                            <option value="лютий">лютий</option>
+                            <option value="березень">березень</option>
+                            <option value="квітень">квітень</option>
+                            <option value="травень">травень</option>
+                            <option value="червень">червень</option>
+                            <option value="липень">липень</option>
+                            <option value="серпень">серпень</option>
+                            <option value="вересень">вересень</option>
+                            <option value="жовтень">жовтень</option>
+                            <option value="листопад">листопад</option>
+                            <option value="грудень">грудень</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="incomeYear">Рік</label>
+                    <input type="number" id="incomeYear" value="2026">
+                </div>
+            </div>
+
+            <div class="row hidden-field" id="workingCapacityRow" style="margin-bottom: 16px; display: none;">
+                <div class="input-group" style="grid-column: 1 / -1; margin-bottom: 0;">
+                    <label for="workingCapacitySelect">Статус працездатності заявника (для перевірки лімітів)</label>
+                    <select id="workingCapacitySelect">
+                        <option value="able">Працездатна особа (поріг 6 656 грн)</option>
+                        <option value="disabled">Особа, яка втратила працездатність (поріг 5 190 грн)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Перемикач вкладок над полями доходів (для категорії п. 1 Малозабезпечені) -->
+            <div id="incomeCalcTabsContainer" class="hidden-field" style="display: none;">
+                <div class="income-calc-tabs">
+                    <button type="button" class="income-tab-btn active" id="tabSimpleCalc">🧮 Простий розрахунок</button>
+                    <button type="button" class="income-tab-btn" id="tabExtendedCalc">⚖️ Розширений розрахунок (за Методикою № 1445/5)</button>
+                </div>
+            </div>
+
+            <!-- Вкладка 1: Простий розрахунок (3 поля за місяцями) -->
+            <div class="row-3 hidden-field" id="threeMonthsBlock" style="margin-bottom: 16px; display: none;">
+                <div class="input-group" style="margin-bottom: 0;">
+                    <label id="labelMonth1" for="incomeMonth1">Місяць 1</label>
+                    <input type="number" id="incomeMonth1" class="month-income" placeholder="0.00" step="0.01">
+                </div>
+                <div class="input-group" style="margin-bottom: 0;">
+                    <label id="labelMonth2" for="incomeMonth2">Місяць 2</label>
+                    <input type="number" id="incomeMonth2" class="month-income" placeholder="0.00" step="0.01">
+                </div>
+                <div class="input-group" style="margin-bottom: 0;">
+                    <label id="labelMonth3" for="incomeMonth3">Місяць 3</label>
+                    <input type="number" id="incomeMonth3" class="month-income" placeholder="0.00" step="0.01">
+                </div>
+            </div>
+
+            <!-- Вкладка 2: Розширений розрахунок за Методикою № 1445/5 -->
+            <div id="extendedCalcBlock" class="hidden-field" style="display: none; margin-bottom: 20px;">
+                <!-- Спеціальні режими розрахунку -->
+                <div class="calc-special-modes">
+                    <div class="special-mode-title">⚖️ Спеціальні режими розрахунку (п. 3 Методики № 1445/5)</div>
+                    <div class="row" style="margin-bottom: 12px;">
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label for="fopStatusSelect">Статус ФОП (абз. 1–4 пп. 6 п. 3)</label>
+                            <select id="fopStatusSelect">
+                                <option value="none">Не є ФОП / ФОП на загальній системі</option>
+                                <option value="fop1">ФОП 1 група ЄП (норматив 8 647,00 грн/міс)</option>
+                                <option value="fop2">ФОП 2 група ЄП (норматив 17 294,00 грн/міс)</option>
+                                <option value="fop3">ФОП 3 група ЄП (норматив 25 941,00 грн/міс)</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin-bottom: 0; display: flex; flex-direction: column; justify-content: center;">
+                            <label class="income-checkbox-label" style="font-size: 13px;">
+                                <input type="checkbox" id="pensionFirstTimeCheck">
+                                <span>Вперше призначено пенсію / звільнення у розрахунковому періоді (пп. 5 п. 3)</span>
+                            </label>
+                            <div id="pensionFirstTimeBlock" style="display: none; margin-top: 8px;">
+                                <input type="number" id="pensionFirstTimeAmount" placeholder="Розмір щомісячної пенсії (грн)" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3 блоки помісячного введення -->
+                <div class="months-cards-container">
+                    <!-- Картка Місяць 1 -->
+                    <div class="month-card" id="monthCard1">
+                        <div class="month-card-header">
+                            <span class="month-card-title" id="monthTitle1">Місяць 1</span>
+                            <span class="month-card-summary">Враховано за місяць: <span id="monthAccounted1">0,00</span> грн</span>
+                        </div>
+                        <div class="income-rows-list" id="incomeRowsContainer1"></div>
+                        <button type="button" class="btn-add-income" id="btnAddIncome1">+ Додати код доходу</button>
+                    </div>
+
+                    <!-- Картка Місяць 2 -->
+                    <div class="month-card" id="monthCard2">
+                        <div class="month-card-header">
+                            <span class="month-card-title" id="monthTitle2">Місяць 2</span>
+                            <span class="month-card-summary">Враховано за місяць: <span id="monthAccounted2">0,00</span> грн</span>
+                        </div>
+                        <div class="income-rows-list" id="incomeRowsContainer2"></div>
+                        <button type="button" class="btn-add-income" id="btnAddIncome2">+ Додати код доходу</button>
+                    </div>
+
+                    <!-- Картка Місяць 3 -->
+                    <div class="month-card" id="monthCard3">
+                        <div class="month-card-header">
+                            <span class="month-card-title" id="monthTitle3">Місяць 3</span>
+                            <span class="month-card-summary">Враховано за місяць: <span id="monthAccounted3">0,00</span> грн</span>
+                        </div>
+                        <div class="income-rows-list" id="incomeRowsContainer3"></div>
+                        <button type="button" class="btn-add-income" id="btnAddIncome3">+ Додати код доходу</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row-3" id="incomeResultsBlock">
+                <div class="input-group">
+                    <label for="incomeTotalAmount">Сума (грн)</label>
+                    <input type="text" id="incomeTotalAmount" placeholder="Наприклад: 13500.00">
+                </div>
+                <div class="input-group" id="averageAmountGroup">
+                    <label for="incomeAverageAmount">Середньомісячна (грн)</label>
+                    <input type="text" id="incomeAverageAmount" placeholder="Наприклад: 4500.00">
+                </div>
+                <div class="input-group">
+                    <label for="incomeSource">Джерело</label>
+                    <input type="text" id="incomeSource" placeholder="пенсія, заробітна плата...">
+                </div>
+            </div>
+
+            <div id="incomeWarning" style="display: none; color: var(--md-sys-color-error); background-color: #ffdad6; padding: 16px; border-radius: 8px; margin-top: 15px; font-size: 14px; border: 1px solid var(--md-sys-color-error);">
+                <div id="incomeWarningSummary">
+                    <strong>⚠️ Увага!</strong> Зазначений дохід перевищує встановлений законом поріг (<strong id="incomeLimitSpan">0</strong> <strong>грн</strong>) для цієї категорії.
+                </div>
+                <div id="incomeWarningDetails" style="margin-top: 10px;"></div>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <h3 class="section-title" id="titleAttachments">4. Додатки</h3>
+            <div id="attachmentsContainer"></div>
+            <button type="button" class="btn-icon btn-add" id="btnAddAttachment">+ Додати рядок</button>
+        </section>
+
+        <section class="form-section">
+            <h3 class="section-title" id="titleSignature">5. Підпис</h3>
+            <div class="row">
+                <div class="input-group">
+                    <label for="docDate">Дата</label>
+                    <input type="date" id="docDate">
+                </div>
+                <div class="input-group">
+                    <label for="signerName">П.І.Б., підпис заявника/представника</label>
+                    <input type="text" id="signerName" placeholder="Заповнюється автоматично" readonly>
+                </div>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <h3 class="section-title">6. Службові відмітки</h3>
+            <div class="input-group">
+                <label for="workerName">ПІБ працівника, який прийняв заяву (у називному) *</label>
+                <input type="text" id="workerName" placeholder="Петров Петро Петрович">
+                <div class="spinner" id="spinnerWorker"></div>
+                <div id="workerGenitiveHelper" class="inflection-helper">
+                    <label for="workerNameGenitive">Родовий відмінок (Кого? — для службових):</label>
+                    <input type="text" id="workerNameGenitive" placeholder="Петрова Петра Петровича">
+                </div>
+            </div>
+            <div class="row">
+                <div class="input-group">
+                    <label for="rkzkNum">№ РКЗК *</label>
+                    <input type="text" id="rkzkNum" placeholder="Наприклад: 2026-1234568">
+                </div>
+                <div class="input-group">
+                    <label for="regNum">Реєстраційний номер звернення</label>
+                    <input type="text" id="regNum" placeholder="Наприклад: 123/4ОБ">
+                </div>
+            </div>
+            <div class="input-group">
+                <label for="regDate">Дата реєстрації звернення</label>
+                <input type="date" id="regDate">
+            </div>
+        </section>
+
+        <section class="form-section">
+            <h3 class="section-title">7. Накази</h3>
+            <div class="input-group">
+                <label for="orderSigner">Підписант</label>
+                <select id="orderSigner">
+                    <option value="Сергій МЕРЗЛЯКОВ">Сергій МЕРЗЛЯКОВ</option>
+                    <option value="Сергій КУДРЯВЦЕВ">Сергій КУДРЯВЦЕВ</option>
+                </select>
+            </div>
+        </section>
+
+        <section class="form-section">
+            <h3 class="section-title">8. Службовий лист</h3>
+            <div class="row">
+                <div class="input-group">
+                    <label for="letterPosition">Посада працівника</label>
+                    <select id="letterPosition">
+                        <option value="помічник юриста">помічник юриста</option>
+                        <option value="юрист">юрист</option>
+                        <option value="начальник">начальник</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="letterBureau">Назва бюро</label>
+                    <select id="letterBureau">
+                        <option value="Одеського бюро правничої допомоги №1">Одеського бюро правничої допомоги №1</option>
+                        <option value="Одеського бюро правничої допомоги №3">Одеського бюро правничої допомоги №3</option>
+                        <option value="Одеського бюро правничої допомоги №4">Одеського бюро правничої допомоги №4</option>
+                        <option value="Доброславського бюро правничої допомоги">Доброславського бюро правничої допомоги</option>
+                        <option value="Біляївського бюро правничої допомоги">Біляївського бюро правничої допомоги</option>
+                        <option value="Овідіопольського бюро правничої допомоги">Овідіопольського бюро правничої допомоги</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="input-group">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 6px; flex-wrap: wrap; gap: 10px;">
+                    <label for="letterAdditionalInfo" style="margin-bottom: 0; flex: 1; min-width: 200px;">
+                        Зазначити додаткову інформацію (тільки для службового листа на адвоката)
+                        <span id="helpAiBtn" class="help-icon" title="Як налаштувати ШІ?">?</span>
+                    </label>
+                    <div class="ai-actions">
+                        <button type="button" class="btn-ai" id="btnAIFormalize" title="Перетворити чернетку на офіційне обґрунтування">✨ Офіційно</button>
+                        <button type="button" class="btn-ai" id="btnAIProofread" title="Виправити орфографічні та стилістичні помилки">📝 Коректор</button>
+                    </div>
+                </div>
+
+                <div id="aiHelpDescription" class="law-description-box" style="margin-top: 0; margin-bottom: 15px; border-left-color: #005cbb;">
+                    <strong style="color: var(--md-sys-color-primary);">🤖 Як увімкнути функції штучного інтелекту (ШІ)?</strong><br>
+                    <div style="margin-top: 8px;">Оскільки файл працює локально на вашому комп'ютері, для роботи ШІ потрібен особистий безкоштовний ключ доступу. Ось як його отримати:</div>
+                    <ol style="margin-top: 5px; margin-bottom: 10px; padding-left: 20px;">
+                        <li>Перейдіть на сайт <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--md-sys-color-primary); font-weight: bold;">aistudio.google.com</a> (потрібно увійти через Google-акаунт).</li>
+                        <li>Натисніть кнопку <b>"Create API key"</b> (Створити API ключ).</li>
+                        <li>Скопіюйте згенерований довгий набір символів.</li>
+                        <li>Натисніть в програмі «✨ Офіційно» або «📝 Коректор» і вставте ключ у віконце, що з'явиться.</li>
+                    </ol>
+                    <span style="opacity: 0.8; font-size: 12px;">🔒 Ключ зберігається лише у вашому браузері і нікуди не передається. Якщо захочете змінити ключ, натисніть <a href="#" id="resetAiKeyBtn" style="color: var(--md-sys-color-error);">тут, щоб скинути налаштування</a>.</span>
+                </div>
+
+                <div style="position: relative;">
+                    <textarea id="letterAdditionalInfo" placeholder="Наприклад: Справа потребує підготовки до судового розгляду..."></textarea>
+                    <div id="aiLoadingOverlay" class="ai-loading-overlay"><div class="spinner-ai"></div></div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="form-section" style="border: 1px solid #f57f17;">
+            <h3 class="section-title" style="color: #f57f17;">9. Налаштування (Герб)</h3>
+            <div class="input-group">
+                <div id="dropZone" class="drop-zone">
+                    <span id="dropZoneText">📁 Перетягніть файл герба сюди (png, jpg)</span>
+                    <input type="file" id="logoUpload" accept="image/png, image/jpeg" style="display: none;">
+                </div>
+                <div id="logoPreview" style="margin-top: 15px; display: none; align-items: center; gap: 15px;">
+                    <img id="logoPreviewImg" style="height: 90px; width: auto; background: white;" alt="Герб">
+                    <button type="button" id="btnClearLogo" class="btn-icon btn-remove" title="Скинути герб до стандартного">✕</button>
+                </div>
+            </div>
+        </section>
+
+        <div class="mobile-sticky-bar">
+            <div class="btn-group-actions">
+                <div class="action-row">
+                    <button type="button" class="btn-preview-icon" id="btnPreviewDoc" title="Перегляд Заяви">👁️</button>
+                    <button type="button" class="btn-generate" id="btnGenerateDoc">📄 Сформувати Заяву</button>
+                </div>
+                <div class="action-row">
+                    <button type="button" class="btn-preview-icon" id="btnPreviewTalon" title="Перегляд Талону">👁️</button>
+                    <button type="button" class="btn-generate" id="btnGenerateTalon">🔖 Сформувати Талон</button>
+                </div>
+            </div>
+        </div>
+
+        <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--md-sys-color-outline); opacity: 0.3;">
+        
+        <div class="row">
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="action-row">
+                    <button type="button" class="btn-preview-icon" id="btnPreviewOrderLawyer" title="Перегляд">👁️</button>
+                    <button type="button" class="btn-generate btn-secondary" id="btnGenerateOrderLawyer">Наказ на адвоката</button>
+                </div>
+                <div class="action-row">
+                    <button type="button" class="btn-preview-icon" id="btnPreviewLetterLawyer" title="Перегляд">👁️</button>
+                    <button type="button" class="btn-generate btn-secondary" id="btnGenerateLetterLawyer">Службова на адвоката</button>
+                </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div class="action-row">
+                    <button type="button" class="btn-preview-icon" id="btnPreviewOrderEmployee" title="Перегляд">👁️</button>
+                    <button type="button" class="btn-generate btn-secondary" id="btnGenerateOrderEmployee">Наказ на працівника</button>
+                </div>
+                <div class="action-row">
+                    <button type="button" class="btn-preview-icon" id="btnPreviewLetterEmployee" title="Перегляд">👁️</button>
+                    <button type="button" class="btn-generate btn-secondary" id="btnGenerateLetterEmployee">Службова на працівника</button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+</body>
+</html>
